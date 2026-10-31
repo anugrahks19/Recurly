@@ -1,6 +1,0 @@
-node_modules/
-dist/
-.chrome-test/
-*-check*.png
-*-browser.png
-mobile-scrolled.png

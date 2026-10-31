@@ -4,8 +4,12 @@ import { useAuth, homeForRole } from '../features/auth/AuthContext.jsx';
 import { Landing } from '../features/public/Landing.jsx';
 import { Login } from '../features/auth/Login.jsx';
 import { Signup } from '../features/auth/Signup.jsx';
-import { RoleHome } from '../features/dashboard/RoleHome.jsx';
+import { PasswordReset } from '../features/auth/PasswordReset.jsx';
+import { CustomerRoutes } from '../features/customer/routes/CustomerRoutes.jsx';
+import { CustomerProvider } from '../features/customer/hooks/useCustomer.jsx';
+import AdminApp from '../features/admin/AdminApp.jsx';
 import { StaffLayout } from '../features/staff/components/StaffLayout.jsx';
+import { StaffDataProvider } from '../features/staff/components/StaffDataProvider.jsx';
 import { StaffHome } from '../features/staff/pages/StaffHome.jsx';
 import { ManageCustomers } from '../features/staff/pages/ManageCustomers.jsx';
 import { DiscountsQueries } from '../features/staff/pages/DiscountsQueries.jsx';
@@ -26,9 +30,12 @@ export function App() {
     <Route path="/" element={<Landing />} />
     <Route path="/login" element={<Login />} />
     <Route path="/signup" element={<Signup />} />
-    <Route path="/account" element={<Protected role="user"><RoleHome role="user" /></Protected>} />
-    <Route path="/admin" element={<Protected role="admin"><RoleHome role="admin" /></Protected>} />
-    <Route path="/staff" element={<Protected role="staff"><StaffLayout /></Protected>}>
+    <Route path="/forgot-password" element={<PasswordReset />} />
+    <Route path="/reset-password" element={<PasswordReset />} />
+    <Route path="/account" element={<Navigate to="/customer/dashboard" replace />} />
+    <Route path="/customer/*" element={<Protected role="user"><CustomerProvider><CustomerRoutes /></CustomerProvider></Protected>} />
+    <Route path="/admin/*" element={<Protected role="admin"><AdminApp /></Protected>} />
+    <Route path="/staff" element={<Protected role="staff"><StaffDataProvider><StaffLayout /></StaffDataProvider></Protected>}>
       <Route index element={<Navigate to="dashboard" replace />} />
       <Route path="dashboard" element={<StaffHome />} />
       <Route path="customers" element={<ManageCustomers />} />
