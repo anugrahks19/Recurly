@@ -6,7 +6,7 @@ import PDFDocument from 'pdfkit';
 
 export const customer = Router();
 customer.use(requireRole('user'));
-const planView = p => ({ id: p.id, name: p.name, description: p.description || '', monthly: money(p.monthly_cents), annual: money(p.annual_cents), trialDays: p.trial_days, features: JSON.parse(p.features_json || '[]') });
+const planView = p => ({ id: p.id, name: p.name, description: p.description || '', daily: p.daily_cents===null?null:money(p.daily_cents), weekly: p.weekly_cents===null?null:money(p.weekly_cents), monthly: money(p.monthly_cents), annual: money(p.annual_cents), trialDays: p.trial_days, features: JSON.parse(p.features_json || '[]') });
 customer.get('/portal', asyncRoute(async (req, res) => {
   const userId = req.user.id;
   const [plans, subscriptions, invoices, payments, notifications, cases, replies] = await Promise.all([

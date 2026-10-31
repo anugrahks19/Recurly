@@ -16,7 +16,7 @@ All live customer, staff, and admin business records are stored in SQL tables. J
 
 ## Database model
 
-The migration defines users, sessions, password resets, products and variants, plans, tax rules, discounts, subscriptions, quotations, invoices and lines, payments, support cases and replies, notifications, admin messages, audit logs, and checkout quotes. Money is stored in integer cents. Recurring invoice generation uses a transaction and a unique subscription/period key to prevent duplicate billing records.
+The migration defines users, sessions, password resets, products and variants, plans, tax rules, discounts, subscriptions, quotations, invoices and lines, payments, support cases and replies, notifications, admin messages, audit logs, and checkout quotes. Money is stored in integer cents. Plans can offer daily, weekly, monthly, and annual billing. Recurring invoice generation uses a transaction and a unique subscription/period key to prevent duplicate billing records.
 
 ## Current external dependencies and limits
 

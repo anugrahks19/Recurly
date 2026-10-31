@@ -10,3 +10,7 @@ test('monthly periods clamp month end, including leap years', () => {
 test('annual periods handle leap day', () => {
   assert.equal(nextPeriod('2024-02-29','annual'),'2025-02-28');
 });
+test('daily and weekly periods cross calendar boundaries', () => {
+  assert.equal(nextPeriod('2025-12-31','daily'),'2026-01-01');
+  assert.equal(nextPeriod('2025-12-29','weekly'),'2026-01-05');
+});

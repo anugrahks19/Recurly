@@ -13,13 +13,13 @@ async function api(path, options) {
 }
 const fields = {
   staff: [['name','Full name'],['email','Email address'],['password','Temporary password'],['specialId','Special ID']],
-  plans: [['name','Plan name'],['description','Description'],['monthly','Monthly price'],['annual','Annual price'],['trialDays','Trial days'],['features','Features, comma separated']],
+  plans: [['name','Plan name'],['description','Description'],['daily','Daily price (optional)'],['weekly','Weekly price (optional)'],['monthly','Monthly price'],['annual','Annual price'],['trialDays','Trial days'],['features','Features, comma separated']],
   products: [['name','Product name'],['type','Type'],['price','Sales price'],['cost','Cost'],['notes','Notes']],
-  subscriptions: [['customerId','Customer ID'],['planId','Plan ID'],['interval','Interval (monthly or annual)'],['discountCode','Discount code (optional)']],
+  subscriptions: [['customerId','Customer ID'],['planId','Plan ID'],['interval','Interval (daily, weekly, monthly, annual)'],['discountCode','Discount code (optional)']],
   coupons: [['code','Code'],['kind','Kind (percent or fixed)'],['value','Value'],['minimum','Minimum purchase'],['minimumQuantity','Minimum quantity'],['scope','Scope (subscription or product)'],['endsAt','End date (optional)'],['usageLimit','Usage limit (optional)']],
   payments: [['invoiceId','Invoice ID'],['amount','Amount'],['method','Method or reference'],['externalReference','External reference'],['note','Note']],
 };
-const numeric = new Set(['monthly','annual','trialDays','price','cost','value','minimum','minimumQuantity','usageLimit','amount']);
+const numeric = new Set(['daily','weekly','monthly','annual','trialDays','price','cost','value','minimum','minimumQuantity','usageLimit','amount']);
 
 export default function AdminApp() {
   const location = useLocation(); const navigate = useNavigate(); const { logout } = useAuth();
