@@ -1,0 +1,27 @@
+:root {
+  /* Core palette from the supplied Stitch screenshot and HTML. */
+  --surface: #f7faf8;
+  --surface-low: #f1f4f2;
+  --surface-high: #e6e9e7;
+  --white: #ffffff;
+  --ink: #181c1b;
+  --muted: #404946;
+  --outline: #c0c8c4;
+  --primary: #36675b;
+  --mint: #a2d5c6;
+  --mint-light: #b9edde;
+  --ochre: #feda54;
+  --ochre-light: #ffe176;
+  --error: #ba1a1a;
+  --font-heading: 'Playfair Display', Georgia, serif;
+  --font-body: Montserrat, Arial, sans-serif;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 8px 24px -4px rgba(30,34,33,.04), 0 2px 6px -1px rgba(30,34,33,.02);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 40px;
+}
