@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { db } from './db.js';
 import { asyncRoute, date, httpError, id, money, parse, requireRole, audit } from './lib.js';
 import PDFDocument from 'pdfkit';
+import { discountEligible, discountAmount } from './discounts.js';
+import { razorpayConfigured, razorpayApi, verifyCheckoutSignature, fulfillCapturedPayment, fulfillInvoicePayment } from './razorpay.js';
 
 export const customer = Router();
 customer.use(requireRole('user'));
@@ -28,10 +30,10 @@ customer.get('/portal', asyncRoute(async (req, res) => {
   });
 }));
 customer.post('/coupons/validate', asyncRoute(async (req, res) => {
-  const { code, planId, interval } = parse(z.object({ code: z.string().trim().min(1), planId: z.string(), interval: z.enum(['daily','weekly','monthly','annual']) }), req.body);
+  const { code, planId, interval, quantity } = parse(z.object({ code: z.string().trim().min(1), planId: z.string(), interval: z.enum(['daily','weekly','monthly','annual']),quantity:z.number().int().min(1).max(10000).default(1) }), req.body);
   const d = await db('discounts').where({ code: code.toUpperCase(), active: true }).first();
   const plan=await db('plans').where({id:planId,active:true}).first();
-  if (!d || !plan || d.scope!=='subscription' || (d.plan_id && d.plan_id !== planId) || (d.starts_at && new Date(d.starts_at) > new Date()) || (d.ends_at && date(d.ends_at) < date(new Date())) || (d.usage_limit !== null && d.times_used >= d.usage_limit) || d.minimum_quantity>1 || (plan[`${interval}_cents`]||0)<d.minimum_cents) throw httpError(400, 'This code is invalid, expired, or not eligible for this plan.');
+  if (!plan || !discountEligible(d,{planId,amountCents:(plan[`${interval}_cents`]||0)*quantity,quantity})) throw httpError(400, 'This code is invalid, expired, or not eligible for this plan.');
   res.json({ code: d.code, kind: d.kind, value: d.kind === 'fixed' ? money(d.value) : d.value, expiresAt: d.ends_at ? date(d.ends_at) : 'No expiry', eligiblePlans: d.plan_id ? [d.plan_id] : [planId] });
 }));
 customer.patch('/profile', asyncRoute(async (req, res) => {
@@ -62,12 +64,76 @@ customer.post('/subscriptions/:id/:action', asyncRoute(async (req, res) => {
   await db.transaction(async trx => { await trx('subscriptions').where({ id: sub.id }).update({ status, auto_renew: status === 'Active' && !!plan.auto_renew, ended_at: status === 'Closed' ? new Date() : null, updated_at: new Date() }); await audit(trx, req.user.id, `subscription.${req.params.action}`, 'subscription', sub.id); });
   res.json({ status });
 }));
-customer.post('/checkout/quote', (_req, res) => res.status(503).json({ message: 'Checkout requires a configured payment provider. No charge or subscription was created.' }));
-customer.post('/checkout/confirm', (_req, res) => res.status(503).json({ message: 'Checkout requires a configured payment provider. No charge or subscription was created.' }));
+customer.post('/checkout/quote',asyncRoute(async(req,res)=>{
+  if(!razorpayConfigured()) throw httpError(503,'Razorpay checkout is not configured.');
+  const b=parse(z.object({planId:z.string().uuid(),interval:z.enum(['daily','weekly','monthly','annual']),quantity:z.number().int().min(1).max(10000).default(1),couponCode:z.string().max(60).nullish(),paymentMethodId:z.string().nullish()}),req.body);
+  const plan=await db('plans').where({id:b.planId,active:true}).first();
+  const today=date(new Date());
+  if(!plan||(plan.available_from&&date(plan.available_from)>today)||(plan.available_until&&date(plan.available_until)<today)) throw httpError(400,'Plan unavailable.');
+  if(b.quantity<plan.minimum_quantity) throw httpError(400,`Minimum quantity is ${plan.minimum_quantity}.`);
+  const unit=plan[`${b.interval}_cents`];if(unit===null||unit===undefined) throw httpError(400,'Billing interval unavailable.');
+  const subtotal=unit*b.quantity;
+  const discount=b.couponCode?await db('discounts').where({code:b.couponCode.toUpperCase(),active:true}).first():null;
+  if(b.couponCode&&!discountEligible(discount,{planId:plan.id,amountCents:subtotal,quantity:b.quantity})) throw httpError(400,'Coupon is expired or ineligible.');
+  const discountCents=discount?discountAmount(discount,subtotal):0;
+  const tax=await db('tax_rules').where({active:true}).first();
+  const taxCents=Math.round((subtotal-discountCents)*(tax?.rate_basis_points||0)/10000);
+  const total=subtotal-discountCents+taxCents;
+  if(total<100) throw httpError(400,'Razorpay requires a first charge of at least INR 1.');
+  const quoteId=id();await db('checkout_quotes').insert({id:quoteId,customer_id:req.user.id,plan_id:plan.id,interval:b.interval,quantity:b.quantity,discount_id:discount?.id||null,subtotal_cents:subtotal,discount_cents:discountCents,tax_cents:taxCents,total_cents:total,expires_at:new Date(Date.now()+15*60000)});
+  res.status(201).json({id:quoteId,subtotal:money(subtotal),discount:money(discountCents),tax:money(taxCents),total:money(total),currency:'INR'});
+}));
+customer.post('/checkout/confirm',asyncRoute(async(req,res)=>{
+  if(!razorpayConfigured()) throw httpError(503,'Razorpay checkout is not configured.');
+  const {quoteId}=parse(z.object({quoteId:z.string().uuid(),paymentMethodId:z.string().nullish()}),req.body);
+  const result=await db.transaction(async trx=>{
+    const quote=await trx('checkout_quotes').where({id:quoteId,customer_id:req.user.id}).forUpdate().first();
+    if(!quote||quote.used_at||new Date(quote.expires_at)<new Date()) throw httpError(409,'Quote expired or already used. Review the price again.');
+    if(quote.razorpay_order_id) return {orderId:quote.razorpay_order_id,amount:quote.total_cents};
+    const order=await razorpayApi('/orders',{method:'POST',body:{amount:quote.total_cents,currency:'INR',receipt:quote.id,notes:{customer_id:req.user.id,plan_id:quote.plan_id}}});
+    if(!order.id||order.amount!==quote.total_cents||order.currency!=='INR') throw httpError(502,'Payment provider returned an unexpected order.');
+    await trx('checkout_quotes').where({id:quote.id}).update({razorpay_order_id:order.id});
+    return {orderId:order.id,amount:order.amount};
+  });
+  res.json({...result,keyId:process.env.RAZORPAY_KEY_ID,currency:'INR',name:'Recurly'});
+}));
+customer.post('/checkout/verify',asyncRoute(async(req,res)=>{
+  const b=parse(z.object({orderId:z.string().min(5).max(80),paymentId:z.string().min(5).max(80),signature:z.string().length(64)}),req.body);
+  const quote=await db('checkout_quotes').where({razorpay_order_id:b.orderId,customer_id:req.user.id}).first();
+  if(!quote||!verifyCheckoutSignature(quote.razorpay_order_id,b.paymentId,b.signature)) throw httpError(400,'Payment signature invalid.');
+  const payment=await razorpayApi(`/payments/${encodeURIComponent(b.paymentId)}`);
+  if(payment.id!==b.paymentId||payment.order_id!==quote.razorpay_order_id) throw httpError(409,'Payment does not belong to this order.');
+  if(payment.status!=='captured') return res.json({status:'pending',message:'Payment is awaiting capture. Your subscription will appear after provider confirmation.'});
+  const result=await fulfillCapturedPayment(payment);
+  res.json({...result,message:'Payment captured and subscription activated.'});
+}));
 customer.post('/payment-methods/setup', (_req, res) => res.status(503).json({ message: 'Payment provider is not configured.' }));
 customer.post('/payment-methods/:id/update', (_req, res) => res.status(503).json({ message: 'Payment provider is not configured.' }));
 customer.post('/payment-methods/:id/default', (_req, res) => res.status(503).json({ message: 'Payment provider is not configured.' }));
 customer.delete('/payment-methods/:id', (_req, res) => res.status(503).json({ message: 'Payment provider is not configured.' }));
+customer.post('/invoices/:id/order',asyncRoute(async(req,res)=>{
+  if(!razorpayConfigured()) throw httpError(503,'Razorpay checkout is not configured.');
+  const result=await db.transaction(async trx=>{
+    const invoice=await trx('invoices').where({id:req.params.id,customer_id:req.user.id}).forUpdate().first();
+    if(!invoice||invoice.status!=='Confirmed'||invoice.total_cents<100) throw httpError(409,'Invoice is not payable through Razorpay.');
+    if(await trx('payments').where({invoice_id:invoice.id,status:'Successful'}).first()) throw httpError(409,'Partially paid invoices require staff review.');
+    const existing=await trx('invoice_orders').where({invoice_id:invoice.id}).first();
+    if(existing) return {orderId:existing.razorpay_order_id,amount:existing.amount_cents};
+    const order=await razorpayApi('/orders',{method:'POST',body:{amount:invoice.total_cents,currency:'INR',receipt:invoice.id,notes:{customer_id:req.user.id,invoice_id:invoice.id}}});
+    if(!order.id||order.amount!==invoice.total_cents||order.currency!=='INR') throw httpError(502,'Payment provider returned an unexpected order.');
+    await trx('invoice_orders').insert({id:id(),invoice_id:invoice.id,customer_id:req.user.id,razorpay_order_id:order.id,amount_cents:order.amount});
+    return {orderId:order.id,amount:order.amount};
+  });res.json({...result,keyId:process.env.RAZORPAY_KEY_ID,currency:'INR',name:'Recurly'});
+}));
+customer.post('/invoices/:id/verify',asyncRoute(async(req,res)=>{
+  const b=parse(z.object({orderId:z.string().min(5).max(80),paymentId:z.string().min(5).max(80),signature:z.string().length(64)}),req.body);
+  const order=await db('invoice_orders').where({invoice_id:req.params.id,customer_id:req.user.id,razorpay_order_id:b.orderId}).first();
+  if(!order||!verifyCheckoutSignature(order.razorpay_order_id,b.paymentId,b.signature)) throw httpError(400,'Payment signature invalid.');
+  const payment=await razorpayApi(`/payments/${encodeURIComponent(b.paymentId)}`);
+  if(payment.id!==b.paymentId||payment.order_id!==order.razorpay_order_id) throw httpError(409,'Payment does not belong to this order.');
+  if(payment.status!=='captured') return res.json({status:'pending',message:'Payment is awaiting capture. The invoice will update after provider confirmation.'});
+  res.json(await fulfillInvoicePayment(payment));
+}));
 customer.get('/invoices/:id/:kind', asyncRoute(async (req, res) => {
   if (!['invoice','receipt'].includes(req.params.kind)) throw httpError(404,'Document not found.');
   const invoice = await db('invoices').where({ id:req.params.id, customer_id:req.user.id }).first();
@@ -79,7 +145,7 @@ customer.get('/invoices/:id/:kind', asyncRoute(async (req, res) => {
   const pdf=new PDFDocument({margin:50}); pdf.pipe(res);
   pdf.fontSize(24).text(req.params.kind==='receipt'?'Payment receipt':'Invoice');
   pdf.moveDown().fontSize(11).text(`Reference: ${invoice.number}`).text(`Date: ${date(invoice.created_at)}`).text(`Due: ${date(invoice.due_date)}`).text(`Status: ${invoice.status}`).text(`Customer: ${req.user.name} (${req.user.email})`);
-  pdf.moveDown(); for(const line of lines) pdf.text(`${line.description}  × ${line.quantity}  $${money(line.total_cents).toFixed(2)}`);
-  pdf.moveDown().text(`Subtotal: $${money(invoice.subtotal_cents).toFixed(2)}`).text(`Discount: -$${money(invoice.discount_cents).toFixed(2)}`).text(`Tax: $${money(invoice.tax_cents).toFixed(2)}`).fontSize(15).text(`Total: $${money(invoice.total_cents).toFixed(2)}`);
+  pdf.moveDown(); for(const line of lines) pdf.text(`${line.description}  × ${line.quantity}  INR ${money(line.total_cents).toFixed(2)}`);
+  pdf.moveDown().text(`Subtotal: INR ${money(invoice.subtotal_cents).toFixed(2)}`).text(`Discount: -INR ${money(invoice.discount_cents).toFixed(2)}`).text(`Tax: INR ${money(invoice.tax_cents).toFixed(2)}`).fontSize(15).text(`Total: INR ${money(invoice.total_cents).toFixed(2)}`);
   pdf.end();
 }));

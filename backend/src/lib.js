@@ -11,6 +11,7 @@ export const money = cents => Number(cents || 0) / 100;
 export const cents = amount => Math.round(Number(amount) * 100);
 export const date = value => new Date(value).toISOString().slice(0, 10);
 export const publicUser = row => ({ id: row.id, name: row.name, email: row.email, role: row.role });
+export const publicOrigin = () => process.env.APP_PUBLIC_URL || (process.env.RENDER_EXTERNAL_HOSTNAME ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : process.env.FRONTEND_ORIGIN);
 export const httpError = (status, message) => Object.assign(new Error(message), { status });
 export const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 export const audit = (trx, actor, action, type, entity, details = {}) => trx('audit_logs').insert({ id: id(), actor_id: actor, action, entity_type: type, entity_id: entity, details_json: JSON.stringify(details) });

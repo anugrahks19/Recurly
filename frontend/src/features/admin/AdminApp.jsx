@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { AdminReports } from './AdminReports.jsx';
+import { IntegrityCases } from './IntegrityCases.jsx';
 
 const base = import.meta.env.VITE_API_BASE_URL || '';
-const sections = ['dashboard','reports','staff','customers','plans','products','variants','templates','taxes','subscriptions','quotations','invoices','payments','coupons','queries','requests','auditLogs'];
+const sections = ['dashboard','integrity','reports','staff','customers','plans','products','variants','templates','templateLines','taxes','subscriptions','quotations','invoices','payments','coupons','queries','requests','auditLogs'];
 const title = key => ({ auditLogs: 'Audit logs' }[key] || key[0].toUpperCase() + key.slice(1));
 async function api(path, options) {
   const response = await fetch(`${base}/api/admin${path}`, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...options });
@@ -18,12 +19,14 @@ const fields = {
   products: [['name','Product name'],['type','Type'],['price','Sales price'],['cost','Cost'],['notes','Notes']],
   variants: [['productId','Product ID'],['name','Variant name'],['priceDelta','Price adjustment']],
   templates: [['name','Template name'],['validityDays','Validity days'],['terms','Terms']],
+  templateLines: [['templateId','Template ID'],['productId','Product ID'],['variantId','Variant ID (optional)'],['quantity','Quantity']],
   taxes: [['name','Tax name'],['rate','Tax percent']],
-  subscriptions: [['customerId','Customer ID'],['planId','Plan ID'],['interval','Interval (daily, weekly, monthly, annual)'],['quantity','Quantity'],['discountCode','Discount code (optional)'],['quotationId','Confirmed quotation ID (optional)']],
-  coupons: [['code','Code'],['kind','Kind (percent or fixed)'],['value','Value'],['minimum','Minimum purchase'],['minimumQuantity','Minimum quantity'],['scope','Scope (subscription or product)'],['endsAt','End date (optional)'],['usageLimit','Usage limit (optional)']],
-  payments: [['invoiceId','Invoice ID'],['amount','Amount'],['method','Method or reference'],['externalReference','External reference'],['note','Note']],
+  subscriptions: [['customerId','Customer ID'],['planId','Plan ID'],['interval','Interval (daily, weekly, monthly, annual)'],['quantity','Quantity'],['expiresOn','Expiry date (optional)'],['paymentTermsDays','Payment terms in days'],['discountCode','Discount code (optional)'],['quotationId','Confirmed quotation ID (optional)']],
+  coupons: [['code','Code'],['kind','Kind (percent or fixed)'],['value','Value'],['minimum','Minimum purchase'],['minimumQuantity','Minimum quantity'],['scope','Scope (subscription or product)'],['planId','Plan ID (optional)'],['productId','Product ID (for product scope)'],['startsAt','Start date (optional)'],['endsAt','End date (optional)'],['usageLimit','Usage limit (optional)']],
+  payments: [['invoiceId','Invoice ID'],['amount','Amount'],['paidAt','Payment date (optional)'],['method','Method or reference'],['externalReference','External reference'],['note','Note']],
 };
-const numeric = new Set(['daily','weekly','monthly','annual','trialDays','minimumQuantity','price','cost','priceDelta','validityDays','rate','value','minimum','usageLimit','amount','quantity']);
+const numeric = new Set(['daily','weekly','monthly','annual','trialDays','minimumQuantity','price','cost','priceDelta','validityDays','rate','value','minimum','usageLimit','amount','quantity','paymentTermsDays']);
+const boolean = new Set(['autoClose','canPause','autoRenew']);
 
 export default function AdminApp() {
   const location = useLocation(); const navigate = useNavigate(); const { logout } = useAuth();
@@ -35,7 +38,7 @@ export default function AdminApp() {
   async function submit(event) {
     event.preventDefault(); setBusy(true); setError('');
     try {
-      const body = Object.fromEntries(Object.entries(form).filter(([,v]) => v !== '').map(([k,v]) => [k, numeric.has(k) ? Number(v) : k === 'features' ? v.split(',').map(x => x.trim()).filter(Boolean) : v]));
+      const body = Object.fromEntries(Object.entries(form).filter(([,v]) => v !== '').map(([k,v]) => [k, numeric.has(k) ? Number(v) : boolean.has(k) ? v === 'true' : k === 'features' ? v.split(',').map(x => x.trim()).filter(Boolean) : v]));
       await api(`/${section}`, { method: 'POST', body: JSON.stringify(body) }); setForm({}); await refresh();
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
@@ -51,10 +54,11 @@ export default function AdminApp() {
       <main className="live-admin-main"><div className="live-admin-title"><div><span className="eyebrow">ADMIN WORKSPACE</span><h1>{title(section)}</h1></div><button onClick={refresh}>Refresh</button></div>
         {error && <p className="live-admin-error" role="alert">{error}</p>}
         {section === 'invoices' && <button onClick={runBilling}>Generate due invoices</button>}
-        {section === 'dashboard' && data && <><div className="live-admin-stats">{Object.entries(data.summary).map(([key,value]) => <article key={key}><span>{title(key)}</span><strong>{key === 'revenue' ? `$${value.toFixed(2)}` : value}</strong></article>)}</div><h2>Recent activity</h2><p>Review invoices, payments, staff requests, and audit logs using the navigation.</p></>}
+        {section === 'dashboard' && data && <><div className="live-admin-stats">{Object.entries(data.summary).map(([key,value]) => <article key={key}><span>{title(key)}</span><strong>{key === 'revenue' ? `₹${value.toFixed(2)}` : value}</strong></article>)}</div><h2>Recent activity</h2><p>Review invoices, payments, staff requests, and audit logs using the navigation.</p></>}
         {section === 'reports' && <AdminReports customers={data?.customers} plans={data?.plans} />}
-        {fields[section] && <section className="live-admin-panel"><h2>Create {section === 'staff' ? 'staff account' : title(section).toLowerCase().slice(0,-1)}</h2><form onSubmit={submit} className="live-admin-form">{fields[section].map(([key,label]) => <label key={key}>{label}<input type={key === 'email' ? 'email' : key === 'password' || key === 'specialId' ? 'password' : numeric.has(key) ? 'number' : 'text'} min={numeric.has(key) && key !== "priceDelta" ? 0 : undefined} step={numeric.has(key) && !['trialDays','minimumQuantity','usageLimit','validityDays','quantity'].includes(key) ? '0.01' : undefined} value={form[key] || ''} onChange={e => setForm({ ...form, [key]: e.target.value })} required={['name','email','password','specialId','monthly','annual','price','type','productId','priceDelta','validityDays','rate','code','kind','value','invoiceId','amount','method','customerId','planId','interval'].includes(key)} /></label>)}<button disabled={busy}>{busy ? 'Saving…' : 'Create'}</button></form></section>}
-        {!['dashboard','reports'].includes(section) && <section className="live-admin-panel"><div className="live-admin-list-head"><h2>{title(section)} records</h2><span>{rows.length} shown</span></div>{rows.length ? <div className="live-admin-table-wrap"><table><thead><tr>{keys.map(k => <th key={k}>{title(k)}</th>)}{['invoices','quotations'].includes(section) && <th>Actions</th>}</tr></thead><tbody>{rows.map(row => <tr key={row.id}>{keys.map(k => <td key={k}>{typeof row[k] === 'object' ? JSON.stringify(row[k]) : String(row[k] ?? '')}</td>)}{section === 'invoices' && <td>{row.status === 'Draft' && <button onClick={() => invoiceAction(row.id,'confirm')}>Confirm</button>}{['Draft','Confirmed'].includes(row.status) && <button onClick={() => invoiceAction(row.id,'cancel')}>Cancel</button>}</td>}{section === 'quotations' && <td>{['Draft','Quotation'].includes(row.status) && <button onClick={() => advanceQuotation(row.id)}>Advance</button>}</td>}</tr>)}</tbody></table></div> : <p>No records yet.</p>}</section>}
+        {section === 'integrity' && <IntegrityCases />}
+        {fields[section] && <section className="live-admin-panel"><h2>Create {section === 'staff' ? 'staff account' : title(section).toLowerCase().slice(0,-1)}</h2><form onSubmit={submit} className="live-admin-form">{fields[section].map(([key,label]) => <label key={key}>{label}<input type={key === 'email' ? 'email' : ['expiresOn','availableFrom','availableUntil','startsAt','endsAt','paidAt'].includes(key) ? 'date' : key === 'password' || key === 'specialId' ? 'password' : numeric.has(key) ? 'number' : 'text'} min={numeric.has(key) && key !== "priceDelta" ? 0 : undefined} step={numeric.has(key) && !['trialDays','minimumQuantity','usageLimit','validityDays','quantity'].includes(key) ? '0.01' : undefined} value={form[key] || ''} onChange={e => setForm({ ...form, [key]: e.target.value })} required={['name','email','password','specialId','monthly','annual','price','type','productId','templateId','priceDelta','validityDays','rate','code','kind','value','invoiceId','amount','method','customerId','planId','interval'].includes(key) && !(section === 'coupons' && (key === 'planId' || key === 'productId'))} /></label>)}{section === 'plans' && [['autoClose','Close automatically at expiry','false'],['canPause','Customer can pause','true'],['autoRenew','Renew automatically','true']].map(([key,label,defaultValue]) => <label key={key}>{label}<select value={form[key] ?? defaultValue} onChange={e => setForm({ ...form, [key]: e.target.value })}><option value="true">Yes</option><option value="false">No</option></select></label>)}<button disabled={busy}>{busy ? 'Saving…' : 'Create'}</button></form></section>}
+        {!['dashboard','reports','integrity'].includes(section) && <section className="live-admin-panel"><div className="live-admin-list-head"><h2>{title(section)} records</h2><span>{rows.length} shown</span></div>{rows.length ? <div className="live-admin-table-wrap"><table><thead><tr>{keys.map(k => <th key={k}>{title(k)}</th>)}{['invoices','quotations'].includes(section) && <th>Actions</th>}</tr></thead><tbody>{rows.map(row => <tr key={row.id}>{keys.map(k => <td key={k}>{typeof row[k] === 'object' ? JSON.stringify(row[k]) : String(row[k] ?? '')}</td>)}{section === 'invoices' && <td><a href={`${base}/api/admin/invoices/${row.id}/pdf`} target="_blank" rel="noreferrer">Print</a>{row.status === 'Draft' && <button onClick={() => invoiceAction(row.id,'confirm')}>Confirm</button>}{row.status === 'Confirmed' && <button onClick={() => invoiceAction(row.id,'send')}>Send</button>}{['Draft','Confirmed'].includes(row.status) && <button onClick={() => invoiceAction(row.id,'cancel')}>Cancel</button>}</td>}{section === 'quotations' && <td>{['Draft','Quotation'].includes(row.status) && <button onClick={() => advanceQuotation(row.id)}>Advance</button>}</td>}</tr>)}</tbody></table></div> : <p>No records yet.</p>}</section>}
       </main></div>
   </div>;
 }

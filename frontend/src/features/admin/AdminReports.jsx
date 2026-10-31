@@ -25,8 +25,8 @@ export function AdminReports({ customers=[], plans=[] }) {
     </form><p>Amounts use invoice creation and payment dates. Active subscriptions are the current count for the selected customer and plan.</p></section>
     {error&&<p className="live-admin-error" role="alert">{error}</p>}
     {report&&<div className="live-admin-stats">{[
-      ['Active subscriptions',report.activeSubscriptions],['Invoices',report.invoiceCount],['Invoiced',`$${report.invoicedAmount.toFixed(2)}`],
-      ['Payments',report.paymentCount],['Collected',`$${report.collectedAmount.toFixed(2)}`],['Overdue invoices',report.overdueInvoices],
+      ['Active subscriptions',report.activeSubscriptions],['Invoices',report.invoiceCount],['Invoiced',`₹${report.invoicedAmount.toFixed(2)}`],
+      ['Payments',report.paymentCount],['Collected',`₹${report.collectedAmount.toFixed(2)}`],['Overdue invoices',report.overdueInvoices],
     ].map(([label,value])=><article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>}
   </>;
 }

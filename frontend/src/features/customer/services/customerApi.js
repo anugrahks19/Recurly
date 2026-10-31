@@ -17,14 +17,17 @@ async function request(path, { method = 'GET', body, signal } = {}) {
 
 export const customerApi = {
   async load() { if (isDemo) return { ...demoStore(), plans: clone(demoPlans) }; return request('/portal'); },
-  async validateCoupon({ code, planId, interval }) {
-    if (!isDemo) return request('/coupons/validate', { method: 'POST', body: { code, planId, interval } });
+  async validateCoupon({ code, planId, interval, quantity }) {
+    if (!isDemo) return request('/coupons/validate', { method: 'POST', body: { code, planId, interval, quantity } });
     const coupon = demoStore().coupons.find(c => c.code.toLowerCase() === code.trim().toLowerCase());
     if (!coupon || coupon.expiresAt < new Date().toISOString().slice(0, 10) || !coupon.eligiblePlans.includes(planId)) throw new Error('This code is invalid, expired, or not eligible for this plan.');
     return coupon;
   },
   async checkoutQuote(body) { if (isDemo) throw new ApiRequiredError('Final pricing'); return request('/checkout/quote', { method: 'POST', body }); },
   async purchase(body) { if (isDemo) throw new ApiRequiredError('Subscription purchase'); return request('/checkout/confirm', { method: 'POST', body }); },
+  async verifyPurchase(body) { if (isDemo) throw new ApiRequiredError('Payment verification'); return request('/checkout/verify', { method: 'POST', body }); },
+  async invoiceOrder(id) { if (isDemo) throw new ApiRequiredError('Invoice payment'); return request(`/invoices/${encodeURIComponent(id)}/order`, { method: 'POST' }); },
+  async verifyInvoicePayment(id,body) { if (isDemo) throw new ApiRequiredError('Invoice payment'); return request(`/invoices/${encodeURIComponent(id)}/verify`, { method: 'POST', body }); },
   async previewChange(id, body) { if (isDemo) throw new ApiRequiredError('Plan-change pricing'); return request(`/subscriptions/${encodeURIComponent(id)}/preview-change`, { method: 'POST', body }); },
   async changeSubscription(id, action, body = {}) { if (isDemo) throw new ApiRequiredError('Subscription change'); return request(`/subscriptions/${encodeURIComponent(id)}/${action}`, { method: 'POST', body }); },
   async downloadInvoice(id, kind = 'invoice') {
@@ -42,3 +45,14 @@ export const customerApi = {
   async createSupportCase(body) { if (isDemo) return saveDemo({ support: [{ ...body, id: `DEMO-${Date.now()}`, date: new Date().toISOString().slice(0, 10), status: 'Demo draft', replies: [] }, ...demoStore().support] }); return request('/support', { method: 'POST', body }); },
   async replyToCase(id, text) { if (isDemo) return saveDemo({ support: demoStore().support.map(c => c.id === id ? { ...c, replies: [...c.replies, { from: 'You', date: new Date().toISOString().slice(0, 10), text }] } : c) }); return request(`/support/${encodeURIComponent(id)}/replies`, { method: 'POST', body: { text } }); },
 };
+
+export async function openRazorpayCheckout(order, profile) {
+  if (!window.Razorpay) await new Promise((resolve,reject)=>{
+    const script=document.createElement('script');script.src='https://checkout.razorpay.com/v1/checkout.js';script.onload=resolve;script.onerror=()=>reject(new Error('Secure checkout could not be loaded.'));document.head.appendChild(script);
+  });
+  return new Promise((resolve,reject)=>{
+    const checkout=new window.Razorpay({key:order.keyId,amount:order.amount,currency:order.currency,name:order.name,order_id:order.orderId,prefill:{name:profile?.name||'',email:profile?.email||''},handler:resolve,modal:{ondismiss:()=>reject(new Error('Checkout was closed before payment.'))}});
+    checkout.on('payment.failed',response=>reject(new Error(response.error?.description||'Payment failed.')));
+    checkout.open();
+  });
+}

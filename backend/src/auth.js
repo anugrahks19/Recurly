@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from './db.js';
-import { asyncRoute, hashSecret, hashToken, httpError, id, parse, publicUser, requireRole, sessionCookie, token, verifySecret, audit } from './lib.js';
+import { asyncRoute, hashSecret, hashToken, httpError, id, parse, publicUser, publicOrigin, requireRole, sessionCookie, token, verifySecret, audit } from './lib.js';
 import nodemailer from 'nodemailer';
 
 export const auth = Router();
@@ -33,7 +33,7 @@ auth.post('/forgot-password', asyncRoute(async (req, res) => {
     const value = token();
     await db('password_resets').insert({ token_hash: hashToken(value), user_id: user.id, expires_at: new Date(Date.now() + 30 * 60000) });
     const transport = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT || 587), secure: Number(process.env.SMTP_PORT) === 465, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } });
-    await transport.sendMail({ from: process.env.SMTP_FROM, to: user.email, subject: 'Reset your Recurly password', text: `Open ${process.env.APP_PUBLIC_URL}/reset-password?token=${encodeURIComponent(value)} to reset your password. This link expires in 30 minutes.` });
+    await transport.sendMail({ from: process.env.SMTP_FROM, to: user.email, subject: 'Reset your Recurly password', text: `Open ${publicOrigin()}/reset-password?token=${encodeURIComponent(value)} to reset your password. This link expires in 30 minutes.` });
   }
   res.json({ message: 'If the address is registered, a reset link has been sent.' });
 }));

@@ -1,5 +1,26 @@
 # Recurly project handoff — 31 October 2026
 
+## Update in this checkout (31 October 2026)
+
+This checkout is `C:\Users\RANEESH\Downloads\Recurly-main\Recurly-main`, not the historical `D:` path below. It has no `.git` directory. The source files are already organized under one `frontend/` and one `backend/`.
+
+- Added migration `002_revenue_integrity.js`: subscription expiry and payment terms, invoice send timestamp and discount rule reference, and auditable integrity cases. Run `npm run migrate` before starting this version.
+- Added migration `003_subscription_lines.js`: product and variant lines in quotation templates, quotations, and subscriptions. Admins add template lines; staff quotations copy current product prices into fixed line snapshots; confirmed monthly quotations carry those lines into subscriptions and recurring invoices.
+- Added migration `004_product_discounts.js`: product-scoped coupons can target one product and apply to its recurring invoice lines. Coupon creation checks the worst-priced variant against product cost and `MIN_MARGIN_PERCENT`. The integrity screen includes explainable subscription health scores from overdue invoices, payment exceptions, renewal settings, and expiry.
+- User selected **Razorpay** as the payment provider. Migrations `005_razorpay_checkout.js` and `006_invoice_orders.js` support server-created orders for initial checkout and confirmed invoice payment. The browser uses Razorpay Standard Checkout; the backend verifies the returned signature, fetches captured payment status, and records payment and subscription/invoice state transactionally. A raw-body signed webhook handles captured payments even if the browser callback is missed. Secrets are configured only in `backend/.env`.
+- Billing now applies payment terms, records the applied discount rule, stops or closes subscriptions at expiry or manual renewal, and validates coupon eligibility through a shared rule. Admins can renew a stopped subscription.
+- Admins can send confirmed invoices through configured SMTP, print invoice PDFs, record uncertain external payments, verify their outcome, and use the Revenue Integrity screen to scan and resolve cases. The scanner detects missing invoices, current-term amount differences, arithmetic errors, invalid discounts, unmatched payments, and uncertain payments. Its amount check may flag legitimate historical price changes because approved term versioning is not implemented.
+- Coupon eligibility is enforced when staff create quotations and when admins create subscriptions. Expired quotations cannot be advanced or used to create subscriptions. Cancellation is blocked after successful payment.
+- Verified locally: `npm test` passes 20 backend tests and `npm run build` passes in the frontend. The new migrations compile for both Knex dialects. Production dependency audits reported zero known vulnerabilities at the time of this check. These tests do not constitute live database, Razorpay, SMTP, or browser acceptance testing.
+
+### Still required before production
+
+1. Run migration and API acceptance tests against live PostgreSQL and MySQL instances, including concurrent billing and payment flows. Neither database service is available in this checkout.
+2. Configure Razorpay test keys and a separate webhook secret, enable automatic capture, and test initial checkout, invoice payment, failed payment, delayed capture, duplicate events, and webhook replay through a publicly reachable HTTPS endpoint. The integration is coded but has not been exercised against a Razorpay account. Razorpay Standard Checkout manages payment method entry; this app does not store card details. Automated recurring mandates/charges and plan-change payment flows remain unimplemented; recurring invoices can be paid manually through Razorpay Checkout.
+3. Configure SMTP and verify password reset and invoice delivery against a real mail service. No credentials were supplied.
+4. Finish line-item editing and customer-facing line details, subscription approval transitions, paginated workspaces, background billing scheduling, backups, monitoring, and performance tests. The integrity and health scans currently read all business records and need scalable batch designs before large deployments. Trial days are not applied to the first Razorpay charge; the checkout discloses this.
+5. Run browser acceptance testing for all three roles using live services. Do not present this checkout as production ready or as already deployed.
+
 ## Current state
 
 - Local project: `D:\Recurly\Recurly-frontend`. It contains one `frontend/` and one `backend/`, plus `docs/`, `research/`, `README.md`, and `techstack.md`.

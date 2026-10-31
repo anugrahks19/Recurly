@@ -3,7 +3,7 @@ import { Modal } from '../../../shared/components/Modal.jsx';
 import { Link } from 'react-router-dom';
 import { Icon, StatusBadge } from '../../../shared/components/Ui.jsx';
 
-export const money = (value, currency = 'USD') => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(Number(value || 0));
+export const money = (value, currency = 'INR') => new Intl.NumberFormat('en-IN', { style: 'currency', currency }).format(Number(value || 0));
 export const dateLabel = value => value ? new Date(`${value.slice(0,10)}T00:00:00`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 export function Notice({ kind = 'info', children }) { return <div className={`notice notice-${kind}`} role={kind === 'error' ? 'alert' : 'status'}><Icon name={kind === 'error' ? 'error' : kind === 'success' ? 'check_circle' : 'info'} /><span>{children}</span></div>; }
 export function LoadingView() { return <div className="load-state" role="status"><span className="loader" /> Loading your account…</div>; }
