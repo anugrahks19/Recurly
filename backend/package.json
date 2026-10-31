@@ -1,0 +1,31 @@
+{
+  "name": "recurly-backend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "migrate": "node src/migrate.js",
+    "billing": "node src/run-billing.js",
+    "bootstrap-admin": "node src/bootstrap-admin.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.1",
+    "helmet": "^8.1.0",
+    "knex": "^3.1.0",
+    "mysql2": "^3.14.0",
+    "nodemailer": "^10.3.1",
+    "pdfkit": "^0.17.1",
+    "pg": "^8.16.0",
+    "zod": "^4.0.0"
+  }
+}

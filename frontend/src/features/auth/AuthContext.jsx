@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { authRequest } from './api.js';
 
 const AuthContext = createContext(null);
-export const homeForRole = { admin: '/admin', staff: '/staff/dashboard', user: '/account' };
+export const homeForRole = { admin: '/admin/dashboard', staff: '/staff/dashboard', user: '/customer/dashboard' };
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
