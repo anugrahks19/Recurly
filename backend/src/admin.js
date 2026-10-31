@@ -3,9 +3,11 @@ import { z } from 'zod';
 import { db } from './db.js';
 import { asyncRoute, audit, cents, date, hashSecret, httpError, id, money, parse, requireRole } from './lib.js';
 import { generateDueInvoices } from './billing.js';
+import { reports } from './reports.js';
 
 export const admin = Router();
 admin.use(requireRole('admin'));
+admin.use('/reports',reports);
 admin.get('/workspace', asyncRoute(async (_req, res) => {
   const [users, plans, products, variants, templates, taxes, subscriptions, invoices, payments, discounts, quotations, cases, messages, logs] = await Promise.all([
     db('users').select('id','name','email','role','active','company','created_at'), db('plans').orderBy('created_at','desc'), db('products').orderBy('created_at','desc'), db('product_variants'), db('quotation_templates'), db('tax_rules'), db('subscriptions').orderBy('created_at','desc').limit(500),

@@ -19,6 +19,7 @@
 .live-admin-form { display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: .9rem; }
 .live-admin-form label { display: grid; gap: .4rem; font-size: .8rem; font-weight: 600; }
 .live-admin-form input { width: 100%; padding: .65rem; border: 1px solid #c7c7c0; border-radius: .35rem; }
+.live-admin-form select { width: 100%; padding: .65rem; border: 1px solid #c7c7c0; border-radius: .35rem; background: #fff; }
 .live-admin-form button, .live-admin button { border: 1px solid #b9bdb6; border-radius: .35rem; background: #fff; padding: .6rem .85rem; color: #203c33; }
 .live-admin-form button { align-self: end; background: #204238 !important; color: #fff !important; }
 .live-admin-error { padding: 1rem; background: #fff0ee; color: #8b211b; border-radius: .4rem; }
