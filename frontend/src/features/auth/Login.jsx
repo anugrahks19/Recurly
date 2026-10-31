@@ -20,7 +20,8 @@ export function Login() {
     try {
       const user = await login({ email: email.trim(), password, role, ...(role !== 'user' ? { specialId: specialId.trim() } : {}) });
       const requested = location.state?.from;
-      navigate(requested === homeForRole[user.role] || requested?.startsWith(`${homeForRole[user.role]}/`) ? requested : homeForRole[user.role], { replace: true });
+      const workspace = { user: '/customer', staff: '/staff', admin: '/admin' }[user.role];
+      navigate(requested === workspace || requested?.startsWith(`${workspace}/`) ? requested : homeForRole[user.role], { replace: true });
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
