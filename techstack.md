@@ -1,52 +1,45 @@
 # Recurly tech stack
 
-This is the target stack for the final subscription management project, with the current implementation called out separately. Today the repository contains frontend workspaces only. Backend and database work still need to be built.
+## Implemented
 
-## Stack at a glance
-
-| Layer | Current implementation | Final project direction |
+| Layer | Technology | Role |
 | --- | --- | --- |
-| Frontend | A unified React 18 app plus an independent React 19 admin workspace; both use JavaScript/JSX, HTML, CSS, and Vite | Integrate the admin workspace into the unified app and connect screens to real API data. |
-| Backend | None | Build a server-side REST API. Node.js with Express is the proposed JavaScript stack; the backend framework is not committed in code yet. |
-| Database | None | Use a relational database: **MySQL or PostgreSQL**. Confirm with the team whether the brief requires one specific engine or both. Select the actual engine before designing migrations. |
-| Authentication | Login/signup UI and a `fetch` client | Backend-managed accounts and sessions with server-enforced User, Staff, and Admin permissions. |
-| Data | Staff seed records in browser `localStorage` and admin sample records in JavaScript files | Store users, customers, plans, subscriptions, quotations, invoices, payments, and requests in the relational database. |
-| API format | Frontend expects JSON over HTTP | JSON is suitable for API requests and responses; it must not be the final source of business records. |
+| Frontend | JavaScript/JSX, HTML, CSS, React 18, React Router 7, Vite 6 | One `frontend/` app for landing, login, signup, customer, staff, and admin workspaces. |
+| Backend | Node.js 20+, Express 5, JavaScript | REST API in `backend/`, with server enforced roles and business workflows. |
+| Database | PostgreSQL **and** MySQL support through Knex 3 (`pg` and `mysql2` drivers) | One SQL schema and migrations can run on either engine. Choose the engine with `DATABASE_CLIENT` and `DATABASE_URL`. Deployments use one engine at a time; no data is copied automatically between them. |
+| Authentication | bcrypt password and special ID hashes, random server sessions in HttpOnly cookies, rate limited login | Public registration creates customer accounts only. Staff accounts require an admin. Initial admin creation uses the CLI bootstrap command. |
+| Documents | PDFKit | Customer invoice and paid receipt downloads. |
+| Email | Nodemailer over SMTP | Password reset links when SMTP is configured. |
+| Validation and security | Zod, Helmet, origin checks, role and ownership checks | Validates API inputs and guards protected operations. |
 
-## Frontend already built
+All live customer, staff, and admin business records are stored in SQL tables. JSON is used as an HTTP response format, and small JSON columns hold plan feature lists and audit details. Customer demo fixtures remain only behind `VITE_DEMO_MODE=true`; they are not the default.
 
-- **Unified app:** React 18.3.1 and React DOM 18.3.1, using JavaScript and JSX. `frontend/index.html` is its HTML entry point.
-- **Navigation:** React Router DOM 7.18.5. Public routes are `/`, `/login`, and `/signup`; protected destinations are `/account`, `/admin`, and `/staff/*`.
-- **Styling:** Plain CSS and custom properties, with Montserrat, Playfair Display, and Material Symbols loaded from Google Fonts.
-- **Tooling:** npm and Vite 6.4.5. `npm ci` installs from the lockfile; `npm run build` creates `frontend/dist/`.
-- **State:** React Context holds the current auth user and staff demo records. The staff demo provider currently saves records in browser `localStorage`.
-- **Independent admin workspace:** `recurly-admin-workspace/` has a sample-data admin dashboard built with React/React DOM 19.3.1 and Vite 7.3.7. It has its own entry point and is not yet integrated into `frontend/` or the shared auth flow.
+## Database model
 
-The versions above come from the two workspace lockfiles. No Node.js version, deployment host, CI pipeline, or automated test runner is configured yet.
+The migration defines users, sessions, password resets, products and variants, plans, tax rules, discounts, subscriptions, quotations, invoices and lines, payments, support cases and replies, notifications, admin messages, audit logs, and checkout quotes. Money is stored in integer cents. Recurring invoice generation uses a transaction and a unique subscription/period key to prevent duplicate billing records.
 
-## Backend to build
+## Current external dependencies and limits
 
-The proposed architecture is a JavaScript Node.js/Express API with one relational database selected from MySQL and PostgreSQL. Keep business rules, authorization, database access, and billing calculations on the server. The browser should call the API for real records, not import a static data file as its final data source.
+- A running PostgreSQL **or** MySQL server and a `DATABASE_URL` are required to operate the backend. Both dialects are implemented in configuration; there is no bundled database server.
+- SMTP credentials are needed for reset emails.
+- A payment provider has not been selected. Automated charging, card storage, customer checkout, and priced plan changes are disabled with explicit API errors. Admins can record verified external payments against confirmed invoices. Payment details must not be entered as raw card data.
+- Odoo is **not** required by the supplied problem statement. The attached text proposes an Odoo oriented future extension; this repository implements a standalone system.
+- The supplied brief also calls for high volume performance and revenue integrity checks. Those require database backed load tests and more implementation before production deployment.
 
-The existing frontend contract expects:
+## Local commands
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/auth/register` | Create a **User** account only. Ignore any client-supplied role. |
-| `POST` | `/api/auth/login` | Verify email, password, selected role, and a special ID for Staff/Admin. |
-| `GET` | `/api/auth/me` | Return the signed-in account and its server-assigned role. |
-| `POST` | `/api/auth/logout` | End the session. |
+```powershell
+cd backend
+npm.cmd ci
+Copy-Item .env.example .env
+# Configure DATABASE_CLIENT, DATABASE_URL, FRONTEND_ORIGIN and bootstrap admin secrets.
+npm.cmd run migrate
+npm.cmd run bootstrap-admin
+npm.cmd run dev
 
-The backend also needs customer, plan, subscription, quotation, invoice, payment, and request endpoints as those features move from demo data to real data. Define the tables, migrations, validation, and API shapes with the backend implementation. Avoid introducing two database engines merely because both are allowed; use both only if the project brief explicitly requires that.
+cd ../frontend
+npm.cmd ci
+npm.cmd run dev
+```
 
-For authentication, hash passwords and special IDs, protect sessions with secure HttpOnly cookies, validate inputs, limit login attempts, and enforce roles and customer ownership on every protected API request. A frontend role selector or route guard is not authorization. See `frontend/README.md` for the current frontend request/response contract.
-
-## Demo data versus final data
-
-`frontend/src/features/staff/components/mockData.js` and `StaffDataProvider.jsx`, plus `recurly-admin-workspace/src/features/admin/services/sampleData.js`, are acceptable for UI demos while the backend is unfinished. Before final submission, replace the staff `localStorage` flow and admin sample records with API calls backed by MySQL or PostgreSQL. The user destination is a placeholder; the independent admin dashboard must be integrated and connected to real data.
-
-Static JSON or hardcoded arrays may remain as test fixtures, sample seeds, or clearly labeled demos. They must not serve as the production database. JSON returned by an API is a transport format and does not conflict with this rule.
-
-## Current gaps
-
-The backend, SQL database, migrations, real authentication, persistent business APIs, and production user/admin data flows are not implemented. The admin dashboard exists as a separate sample-data workspace. Odoo and payment providers appear in research, but this repository has no integration with them. The final database engine and backend framework should be recorded here once the team confirms them.
+The Vite dev server proxies `/api` to `127.0.0.1:3001`. For separate production origins, set `VITE_API_BASE_URL` when building the frontend and `FRONTEND_ORIGIN` on the backend. Run `npm.cmd run billing` on a scheduler for recurring invoices.
