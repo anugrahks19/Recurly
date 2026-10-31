@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 const StaffDataContext = createContext(null);
 const base = import.meta.env.VITE_API_BASE_URL || '';
-const empty = { customers: [], plans: [], discounts: [], queries: [], quotations: [], adminMessages: [] };
+const empty = { customers: [], plans: [], templates: [], discounts: [], queries: [], quotations: [], adminMessages: [] };
 async function request(path, options) {
   const response = await fetch(`${base}/api/staff${path}`, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...options });
   const data = await response.json().catch(() => ({}));
