@@ -1,41 +1,14 @@
 # Recurly
 
-**Subscription Management System**
+Subscription management project with one frontend app in [`frontend`](frontend/). It contains the landing page, user signup, role-aware login, and the staff workspace. Project research and requirements remain in `docs/` and `research/`.
 
-An Odoo Hackathon project exploring how a business can manage the complete subscription lifecycle in one unified platform—from product and plan setup to quotations, recurring invoices, payments, and revenue reporting.
+## Start the frontend
 
-## Challenge
-
-The challenge is based on Brightloop Software, a fictional subscription-based business whose current processes rely on spreadsheets, manually remembered renewals, hand-prepared invoices, manual payment matching, and manually assembled revenue reports.
-
-The project is currently in the **Research & Problem Discovery** stage. The team is studying the problem statement and existing solutions before deciding on the final approach.
-
-## Project status
-
-- **Event:** Odoo Hackathon
-- **Team size:** 4 members
-- **Current stage:** Research & Problem Discovery
-- **Solution and technology choices:** Not yet finalised
-
-## Repository structure
-
-```text
-recurly/
-├── README.md
-├── .gitignore
-├── docs/
-│   ├── problem-overview.md
-│   ├── current-problems.md
-│   └── requirements.md
-├── research/
-│   └── existing-solutions.md
-├── diagrams/
-└── design/
-    └── wireframes/
+```powershell
+cd frontend
+npm.cmd install
+Copy-Item .env.example .env.local
+npm.cmd run dev
 ```
 
-The structure above is the planned team workspace. Individual documents will be added by the members responsible for them.
-
-## Getting started
-
-At this stage, the repository contains project documentation only. Implementation instructions will be added after the team has completed research and agreed on a solution.
+See [`frontend/README.md`](frontend/README.md) for the backend authentication contract and production build instructions.
