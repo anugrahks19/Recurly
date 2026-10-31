@@ -1,0 +1,21 @@
+.public-app .role-options { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; border:0; padding:0; margin:0 0 18px; }
+.public-app .role-options legend { width:100%; margin-bottom:10px; font-size:10px; text-transform:uppercase; letter-spacing:.1em; font-weight:700; color:#56605d; }
+.public-app .role-options label { cursor:pointer; }
+.public-app .role-options input { position:absolute; opacity:0; }
+.public-app .role-options span { display:block; text-align:center; padding:11px; border:1px solid var(--outline); border-radius:6px; font-size:11px; font-weight:700; }
+.public-app .role-options input:checked + span { background:rgba(162,213,198,.25); border-color:var(--sage); color:var(--sage); }
+.public-app .role-options input:focus-visible + span { outline:2px solid var(--sage); outline-offset:2px; }
+.public-app .role-help { margin:0 0 5px; color:var(--muted); font-size:11px; line-height:1.6; }
+.public-app .auth-form .form-grid { margin-bottom:4px; }
+.public-app .auth-small { text-align:center; font-size:11px; margin:5px 0 0; }
+.public-app .auth-small a { color:var(--sage); text-decoration:underline; }
+.public-app .form-message.error { color:#a22626; background:#fff0ef; border-radius:5px; padding:10px; }
+.public-app .restricted-signup { background:var(--soft); padding:24px; border-radius:8px; text-align:center; }
+.public-app .restricted-signup h2 { font:500 25px Playfair Display,serif; }
+.public-app .restricted-signup p { color:var(--muted); font-size:12px; line-height:1.7; }
+.public-app .button:disabled { opacity:.6; cursor:wait; }
+.public-app.role-home { min-height:100vh; }
+.public-app.role-home .section h1 { font:500 clamp(36px,5vw,56px)/1.1 Playfair Display,serif; margin:18px 0; }
+.public-app.role-home .feature-grid { max-width:650px; }
+.loading-screen { min-height:100vh; display:grid; place-items:center; color:#36675b; }
+@media(max-width:600px) { .public-app .role-options { grid-template-columns:repeat(3,1fr); } }
